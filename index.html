@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Querydeck — talk to your data</title>
+  <meta name="description" content="Upload a CSV and ask questions about it in plain English. Runs entirely in your browser with your own LLM API key." />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <h1>Querydeck</h1>
+    </div>
+    <div class="topbar-actions">
+      <span id="rowMeta" class="row-meta" aria-live="polite"></span>
+      <button id="settingsBtn" class="btn btn-ghost" type="button" aria-haspopup="dialog">Settings</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Upload / empty state -->
+    <section id="dropZone" class="dropzone" aria-label="Upload a CSV file">
+      <div class="dropzone-inner">
+        <h2>Talk to your data</h2>
+        <p class="muted">Drop a CSV here or choose a file. Your data stays in the browser — only the column schema and a small sample are ever sent to the model.</p>
+        <div class="dropzone-buttons">
+          <label class="btn btn-primary" for="fileInput">Choose CSV</label>
+          <input id="fileInput" type="file" accept=".csv,text/csv" hidden />
+          <button id="sampleBtn" class="btn btn-ghost" type="button">Load sample data</button>
+        </div>
+        <p id="parseError" class="error" role="alert" hidden></p>
+      </div>
+  </section>
+
+    <!-- Workspace (hidden until a CSV is loaded) -->
+    <section id="workspace" class="workspace" hidden>
+      <div class="panel preview-panel">
+        <div class="panel-head">
+          <h2>Preview <span id="fileName" class="muted"></span></h2>
+          <button id="changeFileBtn" class="btn btn-ghost btn-sm" type="button">Change file</button>
+        </div>
+        <div class="schema" id="schemaList" aria-label="Inferred column types"></div>
+        <div class="table-wrap" id="tableWrap"></div>
+      </div>
+
+      <div class="panel chat-panel">
+        <div class="panel-head">
+          <h2>Ask a question</h2>
+        </div>
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <form id="askForm" class="ask-form" autocomplete="off">
+          <textarea id="question" class="question" rows="2"
+            placeholder="e.g. What's the total revenue per region? Which month had the most orders?"
+            aria-label="Your question"></textarea>
+          <button id="askBtn" class="btn btn-primary" type="submit">Ask</button>
+        </form>
+        <div class="suggestions" id="suggestions" aria-label="Suggested questions"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings dialog -->
+  <dialog id="settingsDialog" class="dialog" aria-label="API settings">
+    <form method="dialog" class="dialog-form">
+      <h2>API settings</h2>
+      <p class="muted">
+        Querydeck is bring-your-own-key. Your key is stored only in this browser's
+        <code>localStorage</code> and sent directly to the provider — never to any Querydeck server (there isn't one).
+      </p>
+
+      <label class="field">
+        <span>Provider</span>
+        <select id="provider">
+          <option value="anthropic">Anthropic (Claude)</option>
+          <option value="openai">OpenAI (GPT)</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span>API key</span>
+        <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" spellcheck="false" />
+      </label>
+
+      <label class="field">
+        <span>Model <span class="muted" id="modelHint"></span></span>
+        <input id="model" type="text" placeholder="model id" spellcheck="false" />
+      </label>
+
+      <p id="settingsError" class="error" role="alert" hidden></p>
+
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" value="cancel" type="submit">Cancel</button>
+        <button id="saveSettings" class="btn btn-primary" value="save" type="submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <footer class="footer">
+    <span>Querydeck · client-side · your data never leaves the browser</span>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
