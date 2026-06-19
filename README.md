@@ -31,10 +31,36 @@ Click **Settings** and paste a key from either provider:
 
 - **Anthropic (Claude)** — calls `api.anthropic.com` directly using the `anthropic-dangerous-direct-browser-access` header. Default model `claude-opus-4-8`; `claude-sonnet-4-6` and `claude-haiku-4-5` also work.
 - **OpenAI (GPT)** — calls `api.openai.com` with a standard bearer token and JSON mode. Default model `gpt-4o`; `gpt-4o-mini`, `gpt-4.1`, etc. also work.
+- **Google Gemini (free)** — calls Gemini's OpenAI-compatible endpoint (`generativelanguage.googleapis.com/v1beta/openai/...`) with a bearer token. Default model `gemini-2.0-flash`. The [AI Studio](https://aistudio.google.com/apikey) tier gives you a free key, so this is the no-cost way to use Querydeck. The endpoint sends CORS headers, so it works directly from the browser like the others.
 
 Pick whichever you have a key for. The key and chosen model persist locally until you change them.
 
 > Calling these APIs straight from the browser exposes your key to client-side code on this page. That's the nature of a keyless, serverless tool — use a key scoped to what you're comfortable with, and revoke it if needed. For shared or production use you'd put a small proxy in front instead.
+
+## Test for free with Gemini
+
+Querydeck ships a tiny end-to-end smoke test that exercises the exact request/parse
+path the app uses, against a real model — for **free**, using Google Gemini.
+
+1. Get a free API key at **[aistudio.google.com/apikey](https://aistudio.google.com/apikey)**.
+2. Run the test (Node 18+, which has built-in `fetch` — no install, no `package.json`):
+
+```bash
+GEMINI_API_KEY=your_key_here node tests/e2e.mjs
+```
+
+It makes one minimal call (`max_tokens: 20`, so it costs essentially nothing on the
+free tier) to Gemini's OpenAI-compatible endpoint
+(`https://generativelanguage.googleapis.com/v1beta/openai/chat/completions`,
+model `gemini-2.0-flash`) using the same bearer-token + `chat/completions` request
+shape the app's OpenAI/Gemini provider uses. It asserts the response parses and
+contains non-empty text, then prints `PASS` (exit 0) or `FAIL: <reason>` (exit 1).
+
+If `GEMINI_API_KEY` is unset it prints `SKIP` and exits 0, so it's safe to wire into CI.
+
+Because it's a Node script there's no browser involved and therefore no CORS — it
+proves the request/parse logic in isolation. In the browser, the Gemini endpoint also
+sends CORS headers, so the in-app **Google Gemini (free)** provider works directly too.
 
 ## Run it locally
 
