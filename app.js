@@ -16,12 +16,16 @@ const STORE_KEY = "querydeck.settings.v1";
 const DEFAULT_MODELS = {
   anthropic: "claude-opus-4-8",
   openai: "gpt-4o",
+  gemini: "gemini-2.0-flash",
 };
 
 const MODEL_HINTS = {
   anthropic: "e.g. claude-opus-4-8, claude-sonnet-4-6, claude-haiku-4-5",
   openai: "e.g. gpt-4o, gpt-4o-mini, gpt-4.1",
+  gemini: "e.g. gemini-2.0-flash, gemini-2.5-flash · free key at aistudio.google.com",
 };
+
+const VALID_PROVIDERS = ["anthropic", "openai", "gemini"];
 
 // How many rows to send to the model as a sample. Kept small on purpose —
 // the model only needs to see the shape of the data, not all of it.
@@ -81,10 +85,11 @@ function loadSettings() {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return { provider: "anthropic", apiKey: "", model: DEFAULT_MODELS.anthropic };
     const parsed = JSON.parse(raw);
+    const provider = VALID_PROVIDERS.includes(parsed.provider) ? parsed.provider : "anthropic";
     return {
-      provider: parsed.provider === "openai" ? "openai" : "anthropic",
+      provider,
       apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
-      model: typeof parsed.model === "string" && parsed.model ? parsed.model : DEFAULT_MODELS[parsed.provider] || DEFAULT_MODELS.anthropic,
+      model: typeof parsed.model === "string" && parsed.model ? parsed.model : DEFAULT_MODELS[provider] || DEFAULT_MODELS.anthropic,
     };
   } catch {
     return { provider: "anthropic", apiKey: "", model: DEFAULT_MODELS.anthropic };
@@ -575,7 +580,26 @@ async function callAnthropic(settings, system, userPrompt) {
 }
 
 async function callOpenAI(settings, system, userPrompt) {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  return callOpenAICompatible(settings, system, userPrompt, {
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    name: "OpenAI",
+  });
+}
+
+// Google Gemini exposes an OpenAI-compatible Chat Completions endpoint, so the
+// request/parse path is identical to OpenAI — only the URL changes. The free
+// AI Studio tier makes this the no-cost way to use (and test) Querydeck.
+// Get a free key at https://aistudio.google.com/apikey.
+async function callGemini(settings, system, userPrompt) {
+  return callOpenAICompatible(settings, system, userPrompt, {
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    name: "Gemini",
+  });
+}
+
+// Shared caller for any OpenAI-compatible chat/completions endpoint.
+async function callOpenAICompatible(settings, system, userPrompt, { endpoint, name }) {
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -592,7 +616,7 @@ async function callOpenAI(settings, system, userPrompt) {
     }),
   });
 
-  if (!res.ok) throw await providerError(res, "OpenAI");
+  if (!res.ok) throw await providerError(res, name);
   const data = await res.json();
   return data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
 }
@@ -665,7 +689,9 @@ async function ask(question) {
     const raw =
       settings.provider === "openai"
         ? await callOpenAI(settings, system, userPrompt)
-        : await callAnthropic(settings, system, userPrompt);
+        : settings.provider === "gemini"
+          ? await callGemini(settings, system, userPrompt)
+          : await callAnthropic(settings, system, userPrompt);
 
     thinking.remove();
     const { answer, chart } = parseModelResponse(raw);
